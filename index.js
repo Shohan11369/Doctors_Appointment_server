@@ -1121,4 +1121,9 @@ app.post(
 
 // Add other routes similarly...
 
-app.listen(port, () => console.log(`Server running on port ${port}`));
+// Export app for Vercel/Serverless, otherwise start normally locally
+if (process.env.NODE_ENV === 'production') {
+  module.exports = app;
+} else {
+  app.listen(port, () => console.log(`Server running on port ${port}`));
+}
