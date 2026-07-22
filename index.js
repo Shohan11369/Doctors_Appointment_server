@@ -16,7 +16,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
 // Middleware
 app.use(express.json());
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+const FRONTEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 app.use(
   cors({
     origin: FRONTEND_URL,
@@ -176,7 +176,7 @@ const auth = betterAuth({
   database: mongodbAdapter(mongoClient.db("DoctorsAppoint")),
   secret: process.env.BETTER_AUTH_SECRET || "a_secure_random_string_for_session_encryption_fallback",
   trustedOrigins: ["http://localhost:3000", "http://localhost:5000"],
-  baseURL: process.env.BASE_URL || "http://localhost:5000",
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID",
@@ -184,7 +184,7 @@ const auth = betterAuth({
         process.env.GOOGLE_CLIENT_SECRET || "YOUR_GOOGLE_CLIENT_SECRET",
     },
   },
-  baseURL: process.env.BASE_URL || "http://localhost:5000",
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
 });
 
 const authenticate = (req, res, next) => {
@@ -222,7 +222,7 @@ app.get("/api/auth/google", (req, res) => {
   res.cookie("final_redirect", finalCallbackURL, { path: "/", maxAge: 1000 * 60 * 15 });
 
   const successUrl = process.env.BASE_URL 
-    ? `${process.env.BASE_URL}/api/auth/google/success` 
+    ? `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google/success` 
     : "http://localhost:5000/api/auth/google/success";
 
   res.send(`
