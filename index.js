@@ -17,6 +17,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 // Middleware
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:5000",
   "https://doctots-appointment-front.vercel.app",
 ];
 
@@ -210,7 +211,7 @@ async function initAuth() {
   auth = betterAuth({
     database: mongodbAdapter(mongoClient.db("DoctorsAppoint")),
     secret: process.env.BETTER_AUTH_SECRET || "a_secure_random_string_for_session_encryption_fallback",
-    trustedOrigins: ["http://localhost:3000", "http://localhost:5000"],
+    trustedOrigins: ["http://localhost:3000", "http://localhost:5000", "https://doctots-appointment-front.vercel.app"],
     baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
     socialProviders: {
       google: {
@@ -220,12 +221,21 @@ async function initAuth() {
       },
     },
   });
-  
-  const { toNodeHandler } = await import("better-auth/node");
-  app.all(["/api/auth", "/api/auth/*path"], toNodeHandler(auth));
-}
 
-initAuth().catch(err => console.error("Error initializing auth:", err));
+  console.log("Better Auth initialized successfully");
+
+  const { toNodeHandler } = await import("better-auth/node");
+  app.all(["/api/auth", "/api/auth/*path"], (req, res, next) => {
+    try {
+      return toNodeHandler(auth)(req, res, next);
+    } catch (err) {
+      console.error("Error in auth handler:", err);
+      res.status(500).json({ error: "Internal Auth Error", details: err.message });
+    }
+  });
+  }
+
+  initAuth().catch(err => console.error("Error initializing auth:", err));
 
 // --- Routes ---
 // Custom Bridge for GET /api/auth/google
