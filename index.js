@@ -223,7 +223,7 @@ app.get("/api/auth/google", (req, res) => {
 
   const successUrl = process.env.BASE_URL 
     ? `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google/success` 
-    : "http://localhost:5000/api/auth/google/success";
+    : `${process.env.NEXT_PUBLIC_API_URL}/success`;
 
   res.send(`
     <!DOCTYPE html>
