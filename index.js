@@ -234,7 +234,7 @@ async function initAuth() {
 // --- Routes ---
 // Custom Bridge for GET /api/auth/google
 app.get("/api/auth/google", (req, res) => {
-  const finalCallbackURL = req.query.callbackURL || "http://localhost:3000";
+  const finalCallbackURL = req.query.callbackURL || "https://doctots-appointment-front.vercel.app";
   const role = req.query.role || "patient";
 
   res.cookie("pending_role", role, { path: "/", maxAge: 1000 * 60 * 15 });
