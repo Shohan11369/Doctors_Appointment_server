@@ -207,13 +207,11 @@ async function initAuth() {
     secret: process.env.BETTER_AUTH_SECRET || "a_secure_random_string_for_session_encryption_fallback",
     trustedOrigins: ["http://localhost:3000", "http://localhost:5000", "https://doctots-appointment-front.vercel.app"],
     baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
-    socialProviders: {
-      google: {
-        clientId: process.env.GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID",
-        clientSecret:
-          process.env.GOOGLE_CLIENT_SECRET || "YOUR_GOOGLE_CLIENT_SECRET",
-      },
-    },
+  auth = betterAuth({
+    database: mongodbAdapter(mongoClient.db("DoctorsAppoint")),
+    secret: process.env.BETTER_AUTH_SECRET || "a_secure_random_string_for_session_encryption_fallback",
+    trustedOrigins: ["http://localhost:3000", "http://localhost:5000", "https://doctots-appointment-front.vercel.app"],
+    baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
   });
 
   console.log("Better Auth initialized successfully");
@@ -232,102 +230,6 @@ async function initAuth() {
   initAuth().catch(err => console.error("Error initializing auth:", err));
 
 // --- Routes ---
-// Custom Bridge for GET /api/auth/google
-app.get("/api/auth/google", (req, res) => {
-  const finalCallbackURL = req.query.callbackURL || "https://doctots-appointment-front.vercel.app";
-  const role = req.query.role || "patient";
-
-  res.cookie("pending_role", role, { path: "/", maxAge: 1000 * 60 * 15 });
-  res.cookie("final_redirect", finalCallbackURL, { path: "/", maxAge: 1000 * 60 * 15 });
-
-  const successUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google/success`;
-
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-      <head><title>Redirecting to Google...</title></head>
-      <body>
-        <p>Redirecting to Google securely...</p>
-        <script>
-          fetch('/api/auth/sign-in/social', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              provider: 'google', 
-              callbackURL: '${successUrl}' 
-            })
-          })
-          .then(r => r.json())
-          .then(data => {
-            if (data.url) window.location.href = data.url;
-            else document.body.innerHTML = 'Error initiating Google login. ' + JSON.stringify(data);
-          })
-          .catch(err => document.body.innerHTML = 'Network error: ' + err.message);
-        </script>
-      </body>
-    </html>
-  `);
-});
-
-// OAuth Success Handler
-app.get("/api/auth/google/success", async (req, res) => {
-  try {
-    if (!auth) return res.status(503).send("Auth not initialized");
-    const sessionResponse = await auth.api.getSession({ headers: req.headers });
-    if (!sessionResponse || !sessionResponse.user) {
-      return res.status(401).json({ error: "OAuth login failed or session not found" });
-    }
-
-    const { user } = sessionResponse;
-    const finalRedirect = req.cookies.final_redirect || "http://localhost:3000";
-    const pendingRole = req.cookies.pending_role || "patient";
-
-    let dbUser = await User.findOne({ email: user.email });
-    
-    if (dbUser) {
-      if (!dbUser.password && dbUser.role !== pendingRole) {
-        dbUser.role = pendingRole;
-        await dbUser.save();
-      }
-    } else {
-      const hashedPassword = await bcrypt.hash(Math.random().toString(36).slice(-8), 10);
-      dbUser = new User({
-        name: user.name,
-        email: user.email,
-        password: hashedPassword,
-        role: pendingRole,
-      });
-      await dbUser.save();
-    }
-
-    if (dbUser.role === "doctor") {
-      const existingDoc = await Doctor.findOne({ userId: dbUser._id });
-      if (!existingDoc) {
-        const doctor = new Doctor({
-          userId: dbUser._id,
-          name: dbUser.name,
-          specialization: "General Practitioner",
-          bio: "Experienced healthcare professional.",
-          experience: 0,
-          fee: 0,
-          rating: 0,
-        });
-        await doctor.save();
-      }
-    }
-
-    const token = jwt.sign({ id: dbUser._id, role: dbUser.role }, JWT_SECRET, { expiresIn: "1h" });
-    
-    res.cookie("token", token, { httpOnly: false, sameSite: "lax" });
-    res.clearCookie("pending_role");
-    res.clearCookie("final_redirect");
-
-    res.redirect(finalRedirect);
-  } catch (err) {
-    console.error("Success Handler Error:", err);
-    res.status(500).send("Error finalizing login: " + err.message);
-  }
-});
 
 app.get("/", (req, res) => {
   res.send("Welcome to MediQueue Pro Backend!");
