@@ -38,13 +38,6 @@ mongoose
       "Actual Connected Database:",
       mongoose.connection.db?.databaseName,
     );
-    const collections = await mongoose.connection.db
-      ?.listCollections()
-      .toArray();
-    // console.log(
-    //   "Available collections:",
-    //   collections.map((c) => c.name),
-    // );
   })
   .catch((err) => console.error("Could not connect to MongoDB", err));
 
@@ -166,29 +159,9 @@ const getDoctorProfileByUserId = async (userId) => {
 };
 
 // --- Middleware ---
-const { betterAuth } = require("better-auth");
-const { mongodbAdapter } = require("better-auth/adapters/mongodb");
-const { MongoClient } = require("mongodb");
-const mongoClient = new MongoClient(process.env.MONGODB_URI);
-
-// Better Auth setup inline
-const auth = betterAuth({
-  database: mongodbAdapter(mongoClient.db("DoctorsAppoint")),
-  secret: process.env.BETTER_AUTH_SECRET || "a_secure_random_string_for_session_encryption_fallback",
-  trustedOrigins: ["http://localhost:3000", "http://localhost:5000"],
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID",
-      clientSecret:
-        process.env.GOOGLE_CLIENT_SECRET || "YOUR_GOOGLE_CLIENT_SECRET",
-    },
-  },
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
-});
+let auth;
 
 const authenticate = (req, res, next) => {
-  // Accept token from cookie or Authorization header (Bearer)
   let token = req.cookies && req.cookies.token;
   if (!token && req.headers && req.headers.authorization) {
     const parts = req.headers.authorization.split(" ");
@@ -205,15 +178,40 @@ const authenticate = (req, res, next) => {
 const authorize =
   (roles = []) =>
   (req, res, next) => {
-    if (!roles.includes(req.user.role))
+    if (!req.user || !roles.includes(req.user.role))
       return res.status(403).json({ message: "Access denied" });
     next();
   };
 
-// --- Routes ---
+// Dynamically load Better Auth
+async function initAuth() {
+  const { betterAuth } = await import("better-auth");
+  const { mongodbAdapter } = await import("better-auth/adapters/mongodb");
+  const { MongoClient } = require("mongodb");
+  const mongoClient = new MongoClient(process.env.MONGODB_URI);
 
+  auth = betterAuth({
+    database: mongodbAdapter(mongoClient.db("DoctorsAppoint")),
+    secret: process.env.BETTER_AUTH_SECRET || "a_secure_random_string_for_session_encryption_fallback",
+    trustedOrigins: ["http://localhost:3000", "http://localhost:5000"],
+    baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
+    socialProviders: {
+      google: {
+        clientId: process.env.GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID",
+        clientSecret:
+          process.env.GOOGLE_CLIENT_SECRET || "YOUR_GOOGLE_CLIENT_SECRET",
+      },
+    },
+  });
+  
+  const { toNodeHandler } = await import("better-auth/node");
+  app.all(["/api/auth", "/api/auth/*path"], toNodeHandler(auth));
+}
+
+initAuth().catch(err => console.error("Error initializing auth:", err));
+
+// --- Routes ---
 // Custom Bridge for GET /api/auth/google
-// Captures the desired role, then redirects to Better Auth
 app.get("/api/auth/google", (req, res) => {
   const finalCallbackURL = req.query.callbackURL || "http://localhost:3000";
   const role = req.query.role || "patient";
@@ -251,9 +249,9 @@ app.get("/api/auth/google", (req, res) => {
 });
 
 // OAuth Success Handler
-// This bridges Better Auth's session back to your JWT system and assigns the role
 app.get("/api/auth/google/success", async (req, res) => {
   try {
+    if (!auth) return res.status(503).send("Auth not initialized");
     const sessionResponse = await auth.api.getSession({ headers: req.headers });
     if (!sessionResponse || !sessionResponse.user) {
       return res.status(401).json({ error: "OAuth login failed or session not found" });
@@ -263,17 +261,14 @@ app.get("/api/auth/google/success", async (req, res) => {
     const finalRedirect = req.cookies.final_redirect || "http://localhost:3000";
     const pendingRole = req.cookies.pending_role || "patient";
 
-    // 1. Find or Update Mongoose User
     let dbUser = await User.findOne({ email: user.email });
     
     if (dbUser) {
-      // Update role if they were just newly created (e.g. no password)
       if (!dbUser.password && dbUser.role !== pendingRole) {
         dbUser.role = pendingRole;
         await dbUser.save();
       }
     } else {
-      // Better Auth inserted into 'user' collection, but we need them in Mongoose 'users'
       const hashedPassword = await bcrypt.hash(Math.random().toString(36).slice(-8), 10);
       dbUser = new User({
         name: user.name,
@@ -284,7 +279,6 @@ app.get("/api/auth/google/success", async (req, res) => {
       await dbUser.save();
     }
 
-    // 2. Create Doctor Profile if needed
     if (dbUser.role === "doctor") {
       const existingDoc = await Doctor.findOne({ userId: dbUser._id });
       if (!existingDoc) {
@@ -301,15 +295,12 @@ app.get("/api/auth/google/success", async (req, res) => {
       }
     }
 
-    // 3. Issue Legacy JWT Token so existing middleware works seamlessly
     const token = jwt.sign({ id: dbUser._id, role: dbUser.role }, JWT_SECRET, { expiresIn: "1h" });
     
-    // Set cookies and clear temp state
     res.cookie("token", token, { httpOnly: false, sameSite: "lax" });
     res.clearCookie("pending_role");
     res.clearCookie("final_redirect");
 
-    // Redirect to frontend
     res.redirect(finalRedirect);
   } catch (err) {
     console.error("Success Handler Error:", err);
@@ -317,27 +308,19 @@ app.get("/api/auth/google/success", async (req, res) => {
   }
 });
 
-// Better Auth Express Middleware
-const { toNodeHandler } = require("better-auth/node");
-app.all(["/api/auth", "/api/auth/*path"], toNodeHandler(auth));
-
-// Basic Route
 app.get("/", (req, res) => {
   res.send("Welcome to MediQueue Pro Backend!");
 });
 
-// DEBUG ROUTE
 app.get("/api/debug-doctors", async (req, res) => {
   try {
     const allDoctors = await Doctor.find({});
-    // console.log("DEBUG - All documents in 'doctors' collection:", allDoctors);
     res.json(allDoctors);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Auth
 app.post("/api/register", async (req, res) => {
   try {
     const { name, email, password, role, sex, years } = req.body;
@@ -394,7 +377,6 @@ app.post("/api/login", async (req, res) => {
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, {
       expiresIn: "1h",
     });
-    // Set cookie for convenience and also return token in JSON so frontend can use Authorization header
     res
       .cookie("token", token, { httpOnly: false, sameSite: "lax" })
       .json({ message: "Logged in", token });
@@ -404,7 +386,6 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// Get Admin Overview Stats
 app.get(
   "/api/admin/overview",
   authenticate,
@@ -415,7 +396,6 @@ app.get(
       const totalUsers = await User.countDocuments({});
       const totalDoctors = await Doctor.countDocuments({});
 
-      // Calculate total money (sum of doctor fees for confirmed appointments)
       const confirmedAppointments = await Appointment.find({
         status: "confirmed",
       });
@@ -441,7 +421,6 @@ app.get(
   },
 );
 
-// Update Appointment Status (Admin Only)
 app.patch(
   "/api/admin/appointments/:id",
   authenticate,
@@ -471,7 +450,6 @@ app.patch(
   },
 );
 
-// Delete Appointment (Admin Only)
 app.delete(
   "/api/admin/appointments/:id",
   authenticate,
@@ -490,7 +468,6 @@ app.delete(
   },
 );
 
-// Get All Appointments (Admin Only)
 app.get(
   "/api/admin/appointments",
   authenticate,
@@ -499,7 +476,6 @@ app.get(
     try {
       const appointments = await Appointment.find({});
 
-      // Hydrate appointments with patient and doctor details for the admin view
       const hydratedAppointments = [];
       for (const app of appointments) {
         const patient = await User.findById(app.patientId).select("name email");
@@ -523,7 +499,6 @@ app.get(
   },
 );
 
-// Get Appointment Requests (pending) - Admin Only
 app.get(
   "/api/admin/requests",
   authenticate,
@@ -558,7 +533,6 @@ app.get(
   },
 );
 
-// Get All Reviews (Public)
 app.get("/api/reviews", async (req, res) => {
   try {
     const reviews = await Review.find({}).sort({ createdAt: -1 });
@@ -583,7 +557,6 @@ app.get("/api/reviews", async (req, res) => {
   }
 });
 
-// Get All Reviews - Admin Only
 app.get(
   "/api/admin/reviews",
   authenticate,
@@ -611,7 +584,6 @@ app.get(
   },
 );
 
-// Admin Profile & Overview (current admin info + quick stats)
 app.get(
   "/api/admin/profile",
   authenticate,
@@ -638,7 +610,6 @@ app.get(
   },
 );
 
-// Get Current User
 app.get("/api/me", authenticate, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
@@ -890,7 +861,6 @@ app.get(
   },
 );
 
-// Get My Appointments
 app.get("/api/my-appointments", authenticate, async (req, res) => {
   try {
     const appointments = await Appointment.find({ patientId: req.user.id });
@@ -901,7 +871,6 @@ app.get("/api/my-appointments", authenticate, async (req, res) => {
   }
 });
 
-// Submit a Review
 app.post(
   "/api/reviews",
   authenticate,
@@ -941,14 +910,12 @@ app.post(
   },
 );
 
-// Delete a Review
 app.delete(
   "/api/reviews/:id",
   authenticate,
   authorize(["patient"]),
   async (req, res) => {
     try {
-      // Improved validation: Check for "undefined" string, null, or invalid ObjectId
       if (!req.params.id || req.params.id === 'undefined' || !mongoose.Types.ObjectId.isValid(req.params.id)) {
         return res.status(400).json({ message: "Invalid or missing Review ID" });
       }
@@ -959,7 +926,6 @@ app.delete(
         return res.status(404).json({ message: "Review not found" });
       }
 
-      // Ensure the user is the owner of the review
       if (review.patientId.toString() !== req.user.id) {
         return res.status(403).json({ message: "Forbidden: You can only delete your own reviews" });
       }
@@ -1057,7 +1023,6 @@ app.get(
   },
 );
 
-// Appointment Booking
 app.post("/api/appointments", authenticate, async (req, res) => {
   try {
     const { doctorId, date } = req.body;
@@ -1075,10 +1040,6 @@ app.post("/api/appointments", authenticate, async (req, res) => {
   }
 });
 
-// Routes
-// ... (Auth routes above)
-
-// Doctors (Route to fetch a single doctor by ID)
 app.get("/api/doctor/:id", async (req, res) => {
   console.log("Hit /api/doctor/:id with ID:", req.params.id);
   try {
@@ -1094,7 +1055,6 @@ app.get("/api/doctor/:id", async (req, res) => {
   }
 });
 
-// Doctors (Simple route to fetch all)
 app.get("/api/doctors", async (req, res) => {
   console.log("Hit /api/doctors");
   try {
@@ -1117,9 +1077,6 @@ app.post(
   },
 );
 
-// Add other routes similarly...
-
-// Export app for Vercel/Serverless, otherwise start normally locally
 if (process.env.NODE_ENV === 'production') {
   module.exports = app;
 } else {
