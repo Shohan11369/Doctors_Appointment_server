@@ -15,19 +15,31 @@ const port = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
 // Middleware
-app.use(express.json());
-
-const FRONTEND_URL =
-  process.env.NEXT_PUBLIC_Front_URL ||
-  "https://doctors-appointment-front.vercel.app";
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://doctors-appointment-front.vercel.app",
+];
 
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
   })
 );
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Database Connection
