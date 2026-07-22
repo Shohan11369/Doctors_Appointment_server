@@ -207,11 +207,6 @@ async function initAuth() {
     secret: process.env.BETTER_AUTH_SECRET || "a_secure_random_string_for_session_encryption_fallback",
     trustedOrigins: ["http://localhost:3000", "http://localhost:5000", "https://doctots-appointment-front.vercel.app"],
     baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
-  auth = betterAuth({
-    database: mongodbAdapter(mongoClient.db("DoctorsAppoint")),
-    secret: process.env.BETTER_AUTH_SECRET || "a_secure_random_string_for_session_encryption_fallback",
-    trustedOrigins: ["http://localhost:3000", "http://localhost:5000", "https://doctots-appointment-front.vercel.app"],
-    baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
   });
 
   console.log("Better Auth initialized successfully");
