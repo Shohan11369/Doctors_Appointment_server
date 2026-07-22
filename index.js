@@ -33,11 +33,8 @@ app.use(
     },
     credentials: true, // REQUIRED for cookies
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-    ],
-  })
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
 );
 
 app.use(express.json());
@@ -61,80 +58,90 @@ mongoose
   .catch((err) => console.error("Could not connect to MongoDB", err));
 
 // --- Models ---
-const User = mongoose.models.User || mongoose.model(
-  "User",
-  new mongoose.Schema({
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: {
-      type: String,
-      enum: ["patient", "doctor", "admin"],
-      default: "patient",
-    },
-    sex: String,
-    years: Number,
-  }),
-);
-
-const Doctor = mongoose.models.Doctor || mongoose.model(
-  "Doctor",
-  new mongoose.Schema({
-    userId: mongoose.Schema.Types.ObjectId,
-    name: String,
-    specialization: String,
-    bio: String,
-    image: String,
-    experience: Number,
-    fee: Number,
-    rating: Number,
-  }),
-  "doctors",
-);
-
-const Appointment = mongoose.models.Appointment || mongoose.model(
-  "Appointment",
-  new mongoose.Schema({
-    patientId: mongoose.Schema.Types.ObjectId,
-    doctorId: mongoose.Schema.Types.ObjectId,
-    date: Date,
-    status: {
-      type: String,
-      enum: ["pending", "confirmed", "cancelled"],
-      default: "pending",
-    },
-  }),
-);
-
-const Review = mongoose.models.Review || mongoose.model(
-  "Review",
-  new mongoose.Schema(
-    {
-      doctorId: mongoose.Schema.Types.ObjectId,
-      patientId: mongoose.Schema.Types.ObjectId,
-      rating: Number,
-      comment: String,
-    },
-    { timestamps: true },
-  ),
-);
-
-const DoctorPost = mongoose.models.DoctorPost || mongoose.model(
-  "DoctorPost",
-  new mongoose.Schema(
-    {
-      doctorId: mongoose.Schema.Types.ObjectId,
+const User =
+  mongoose.models.User ||
+  mongoose.model(
+    "User",
+    new mongoose.Schema({
       name: { type: String, required: true },
-      title: { type: String, required: true },
-      content: { type: String, required: true },
-      description: { type: String, required: true },
-      fees: { type: Number, required: true },
-      imageUrl: String,
-    },
-    { timestamps: true },
-  ),
-  "doctorposts",
-);
+      email: { type: String, required: true, unique: true },
+      password: { type: String, required: true },
+      role: {
+        type: String,
+        enum: ["patient", "doctor", "admin"],
+        default: "patient",
+      },
+      sex: String,
+      years: Number,
+    }),
+  );
+
+const Doctor =
+  mongoose.models.Doctor ||
+  mongoose.model(
+    "Doctor",
+    new mongoose.Schema({
+      userId: mongoose.Schema.Types.ObjectId,
+      name: String,
+      specialization: String,
+      bio: String,
+      image: String,
+      experience: Number,
+      fee: Number,
+      rating: Number,
+    }),
+    "doctors",
+  );
+
+const Appointment =
+  mongoose.models.Appointment ||
+  mongoose.model(
+    "Appointment",
+    new mongoose.Schema({
+      patientId: mongoose.Schema.Types.ObjectId,
+      doctorId: mongoose.Schema.Types.ObjectId,
+      date: Date,
+      status: {
+        type: String,
+        enum: ["pending", "confirmed", "cancelled"],
+        default: "pending",
+      },
+    }),
+  );
+
+const Review =
+  mongoose.models.Review ||
+  mongoose.model(
+    "Review",
+    new mongoose.Schema(
+      {
+        doctorId: mongoose.Schema.Types.ObjectId,
+        patientId: mongoose.Schema.Types.ObjectId,
+        rating: Number,
+        comment: String,
+      },
+      { timestamps: true },
+    ),
+  );
+
+const DoctorPost =
+  mongoose.models.DoctorPost ||
+  mongoose.model(
+    "DoctorPost",
+    new mongoose.Schema(
+      {
+        doctorId: mongoose.Schema.Types.ObjectId,
+        name: { type: String, required: true },
+        title: { type: String, required: true },
+        content: { type: String, required: true },
+        description: { type: String, required: true },
+        fees: { type: Number, required: true },
+        imageUrl: String,
+      },
+      { timestamps: true },
+    ),
+    "doctorposts",
+  );
 
 const uploadDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -211,8 +218,14 @@ async function initAuth() {
 
   auth = betterAuth({
     database: mongodbAdapter(mongoClient.db("DoctorsAppoint")),
-    secret: process.env.BETTER_AUTH_SECRET || "a_secure_random_string_for_session_encryption_fallback",
-    trustedOrigins: ["http://localhost:3000", "http://localhost:5000", "https://doctots-appointment-front.vercel.app"],
+    secret:
+      process.env.BETTER_AUTH_SECRET ||
+      "a_secure_random_string_for_session_encryption_fallback",
+    trustedOrigins: [
+      "http://localhost:3000",
+      "http://localhost:5000",
+      "https://doctots-appointment-front.vercel.app",
+    ],
     baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
   });
 
@@ -224,12 +237,14 @@ async function initAuth() {
       return toNodeHandler(auth)(req, res, next);
     } catch (err) {
       console.error("Error in auth handler:", err);
-      res.status(500).json({ error: "Internal Auth Error", details: err.message });
+      res
+        .status(500)
+        .json({ error: "Internal Auth Error", details: err.message });
     }
   });
-  }
+}
 
-  initAuth().catch(err => console.error("Error initializing auth:", err));
+initAuth().catch((err) => console.error("Error initializing auth:", err));
 
 // --- Routes ---
 
@@ -303,10 +318,10 @@ app.post("/api/login", async (req, res) => {
       expiresIn: "1h",
     });
     res
-      .cookie("token", token, { 
-        httpOnly: true, 
-        secure: true, 
-        sameSite: "none" 
+      .cookie("token", token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
       })
       .json({ message: "Logged in", token });
   } catch (error) {
@@ -723,12 +738,31 @@ app.post(
   "/api/doctor/posts",
   authenticate,
   authorize(["doctor"]),
-  upload.single("image"),
+  (req, res, next) => {
+    upload.single("image")(req, res, (err) => {
+      if (err) {
+        console.error("Multer error:", err);
+        return res.status(400).json({
+          message: err.message || "File upload error",
+        });
+      }
+      next();
+    });
+  },
   async (req, res) => {
     try {
       const { name, title, content, description, fees } = req.body;
       if (!name || !title || !content || !description || !fees) {
-        return res.status(400).json({ message: "All fields are required" });
+        return res.status(400).json({
+          message: "All fields are required",
+          missingFields: {
+            name: !name,
+            title: !title,
+            content: !content,
+            description: !description,
+            fees: !fees,
+          },
+        });
       }
 
       const doctor = await getDoctorProfileByUserId(req.user.id);
@@ -845,18 +879,26 @@ app.delete(
   authorize(["patient"]),
   async (req, res) => {
     try {
-      if (!req.params.id || req.params.id === 'undefined' || !mongoose.Types.ObjectId.isValid(req.params.id)) {
-        return res.status(400).json({ message: "Invalid or missing Review ID" });
+      if (
+        !req.params.id ||
+        req.params.id === "undefined" ||
+        !mongoose.Types.ObjectId.isValid(req.params.id)
+      ) {
+        return res
+          .status(400)
+          .json({ message: "Invalid or missing Review ID" });
       }
 
       const review = await Review.findById(req.params.id);
-      
+
       if (!review) {
         return res.status(404).json({ message: "Review not found" });
       }
 
       if (review.patientId.toString() !== req.user.id) {
-        return res.status(403).json({ message: "Forbidden: You can only delete your own reviews" });
+        return res
+          .status(403)
+          .json({ message: "Forbidden: You can only delete your own reviews" });
       }
 
       await Review.findByIdAndDelete(req.params.id);
@@ -1006,7 +1048,47 @@ app.post(
   },
 );
 
-if (process.env.NODE_ENV === 'production') {
+// Error handling middleware for multer and other errors
+app.use((error, req, res, next) => {
+  console.error("Middleware error:", error);
+
+  // Handle multer errors
+  if (error.code === "LIMIT_PART_COUNT") {
+    return res.status(400).json({ message: "Too many parts in the request" });
+  }
+  if (error.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({ message: "File too large" });
+  }
+  if (error.code === "LIMIT_FILE_COUNT") {
+    return res.status(400).json({ message: "Too many files" });
+  }
+  if (error.code === "LIMIT_FIELD_KEY") {
+    return res.status(400).json({ message: "Field name too long" });
+  }
+  if (error.code === "LIMIT_FIELD_VALUE") {
+    return res.status(400).json({ message: "Field value too large" });
+  }
+  if (error.code === "LIMIT_FIELD_COUNT") {
+    return res.status(400).json({ message: "Too many fields" });
+  }
+  if (error.code === "LIMIT_UNEXPECTED_FILE") {
+    return res.status(400).json({
+      message: "Unexpected file field. Use 'image' as the field name.",
+    });
+  }
+  if (error.message && error.message.includes("Unexpected field")) {
+    return res.status(400).json({
+      message: "Unexpected file field. Only 'image' field is allowed.",
+    });
+  }
+
+  // Handle other errors
+  res.status(error.status || 500).json({
+    message: error.message || "Internal server error",
+  });
+});
+
+if (process.env.NODE_ENV === "production") {
   module.exports = app;
 } else {
   app.listen(port, () => console.log(`Server running on port ${port}`));
