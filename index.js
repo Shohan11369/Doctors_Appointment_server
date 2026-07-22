@@ -303,7 +303,11 @@ app.post("/api/login", async (req, res) => {
       expiresIn: "1h",
     });
     res
-      .cookie("token", token, { httpOnly: false, sameSite: "lax" })
+      .cookie("token", token, { 
+        httpOnly: true, 
+        secure: true, 
+        sameSite: "none" 
+      })
       .json({ message: "Logged in", token });
   } catch (error) {
     console.error("Login error:", error);
