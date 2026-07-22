@@ -221,9 +221,7 @@ app.get("/api/auth/google", (req, res) => {
   res.cookie("pending_role", role, { path: "/", maxAge: 1000 * 60 * 15 });
   res.cookie("final_redirect", finalCallbackURL, { path: "/", maxAge: 1000 * 60 * 15 });
 
-  const successUrl = process.env.BASE_URL 
-    ? `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google/success` 
-    : `${process.env.NEXT_PUBLIC_API_URL}/success`;
+  const successUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/auth/google/success`;
 
   res.send(`
     <!DOCTYPE html>
