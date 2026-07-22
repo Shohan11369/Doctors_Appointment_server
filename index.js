@@ -17,7 +17,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 // Middleware
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://doctors-appointment-front.vercel.app",
+  "https://doctots-appointment-front.vercel.app",
 ];
 
 app.use(
