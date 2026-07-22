@@ -16,8 +16,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
 // Middleware
 app.use(express.json());
-const FRONTEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
- const FRONTEND_URL = "https://doctots-appointment-front.vercel.app";
+const FRONTEND_URL = process.env.NEXT_PUBLIC_API_URL || "https://doctors-appointment-front.vercel.app";
 app.use(
   cors({
     origin: FRONTEND_URL,
