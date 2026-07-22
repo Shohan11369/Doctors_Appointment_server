@@ -36,10 +36,10 @@ mongoose
     console.log("Connected to MongoDB");
     console.log(
       "Actual Connected Database:",
-      mongoose.connection.db.databaseName,
+      mongoose.connection.db?.databaseName,
     );
     const collections = await mongoose.connection.db
-      .listCollections()
+      ?.listCollections()
       .toArray();
     // console.log(
     //   "Available collections:",
@@ -49,7 +49,7 @@ mongoose
   .catch((err) => console.error("Could not connect to MongoDB", err));
 
 // --- Models ---
-const User = mongoose.model(
+const User = mongoose.models.User || mongoose.model(
   "User",
   new mongoose.Schema({
     name: { type: String, required: true },
@@ -65,7 +65,7 @@ const User = mongoose.model(
   }),
 );
 
-const Doctor = mongoose.model(
+const Doctor = mongoose.models.Doctor || mongoose.model(
   "Doctor",
   new mongoose.Schema({
     userId: mongoose.Schema.Types.ObjectId,
@@ -80,7 +80,7 @@ const Doctor = mongoose.model(
   "doctors",
 );
 
-const Appointment = mongoose.model(
+const Appointment = mongoose.models.Appointment || mongoose.model(
   "Appointment",
   new mongoose.Schema({
     patientId: mongoose.Schema.Types.ObjectId,
@@ -94,7 +94,7 @@ const Appointment = mongoose.model(
   }),
 );
 
-const Review = mongoose.model(
+const Review = mongoose.models.Review || mongoose.model(
   "Review",
   new mongoose.Schema(
     {
@@ -107,7 +107,7 @@ const Review = mongoose.model(
   ),
 );
 
-const DoctorPost = mongoose.model(
+const DoctorPost = mongoose.models.DoctorPost || mongoose.model(
   "DoctorPost",
   new mongoose.Schema(
     {
