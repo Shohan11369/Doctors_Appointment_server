@@ -8,6 +8,7 @@ const multer = require("multer");
 
 const fs = require("fs");
 const path = require("path");
+const { saveBase64Image } = require("./src/imageStorage");
 require("dotenv").config();
 
 const app = express();
@@ -751,7 +752,7 @@ app.post(
   },
   async (req, res) => {
     try {
-      const { name, title, content, description, fees } = req.body;
+      const { name, title, content, description, fees, image } = req.body;
       if (!name || !title || !content || !description || !fees) {
         return res.status(400).json({
           message: "All fields are required",
@@ -770,7 +771,14 @@ app.post(
         return res.status(404).json({ message: "Doctor profile not found" });
       }
 
-      const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
+      let imageUrl;
+      if (req.file) {
+        imageUrl = `/uploads/${req.file.filename}`;
+      } else if (image) {
+        const savedImage = saveBase64Image(image, uploadDir);
+        imageUrl = savedImage.imageUrl;
+      }
+
       const post = new DoctorPost({
         doctorId: doctor._id,
         name,
@@ -788,6 +796,40 @@ app.post(
     }
   },
 );
+
+
+app.get("/api/posts", async (req, res) => {
+  try {
+    const posts = await DoctorPost.find({})
+      .sort({ createdAt: -1 });
+
+    const output = await Promise.all(
+      posts.map(async (post) => {
+        const doctor = await Doctor.findById(post.doctorId);
+
+        return {
+          _id: post._id,
+          name: post.name,
+          title: post.title,
+          description: post.description,
+          content: post.content,
+          fees: post.fees,
+          imageUrl: post.imageUrl,
+          createdAt: post.createdAt,
+          doctorName: doctor ? doctor.name : "Unknown",
+        };
+      })
+    );
+
+    res.json(output);
+
+  } catch(error){
+    console.error("Error fetching doctor posts:", error);
+    res.status(500).json({
+      message:error.message
+    });
+  }
+});
 
 app.get(
   "/api/doctor/posts",
